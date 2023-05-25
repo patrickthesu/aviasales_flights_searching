@@ -5,7 +5,6 @@ import hashlib
 import config
 
 URL = "http://api.travelpayouts.com/v1/flight_search"
-
 #https://www.aviasales.ru/search/MOW2705ABA1
 #MOW1205ABA1
 
@@ -55,7 +54,9 @@ def getSignature (passengers, tripClass = list(tripClasses.values())[0], *racesd
     passengers = list(passengers.values())
     preEncryption = f"{config.token}:beta.aviasales.ru:{config.locale}:{config.marker}:{passengers[0]}:{passengers[1]}:{passengers[2]}:"
     for racedata in racesdata: preEncryption += makeStrSegment (*racedata)
-    return convertToMd5 (bytes(preEncryption + f"{tripClass}:{config.userIp}", "utf-8"))
+    preEncryption += f"{tripClass}:{config.userIp}"
+    print (preEncryption)
+    return convertToMd5 (bytes(preEncryption, "utf-8"))
 
 def getJsonRequest (passengers, tripClass = list(tripClasses.values())[0], *racesdata, **kwargs):
     jsonRequest = {
@@ -68,6 +69,7 @@ def getJsonRequest (passengers, tripClass = list(tripClasses.values())[0], *race
             "passengers": passengers,
             "segments": makeJsonSegments (*racesdata)
             }
+    print (jsonRequest)
     return jsonRequest
 
 def generateUrl (dep = "", arr = "", date = "2705", persons = 1, ):
@@ -77,23 +79,44 @@ def generateUrl (dep = "", arr = "", date = "2705", persons = 1, ):
 
 def requestFlights (jsonData):
     response = requests.post(URL, json = jsonData)
-    print(response.text)
+    return response.text
 
 def getPage (url):
     session = requests.session ()
     response =  session.post (url)
 
     return response.text
+
+def getCode (text):
+    text = text.replace (" ", "%")
+    print (text)
+    resp = requests.get (f"https://www.travelpayouts.com/widgets_suggest_params?q={text}")
+    print (resp.text)
+    return resp.json()
+
+def get_price(date, origin, destination):
+    date = getStrDate (date)
+    resp = requests.get(f'https://api.travelpayouts.com/aviasales/v3/prices_for_dates?currency=rub&origin={origin}&destination={destination}&departure_at={date}&token={config.token}')
+    
+    if resp.status_code != 200:
+        print(resp.status_code)
+        print(resp.text)
+        print('ПАМАГИТЕ')
+    
+    if not resp.json()['data']:
+        return 0
+    return resp.json()['data'][0]['price']
 #to parse md5
 #https://miraclesalad.com/webtools/md5.php
 
 if __name__ == "__main__":
-    adults = 1
+    #print (getCode (input ()))
+    #print (get_price (datetime.now() + timedelta(days=-1), "SVO", "ABA"))
     newpassengers = passengers.copy()
     newpassengers["adults"] = 1
-    print (getSignature (newpassengers, list(tripClasses.values())[0], [datetime.now() + timedelta(days=5), "MOS", "ABA"]))
-    print (getJsonRequest (newpassengers, list(tripClasses.values())[0], [datetime.now() + timedelta(days=5), "MOS", "ABA"])) 
-    requestFlights (getJsonRequest (newpassengers, list(tripClasses.values())[0], [datetime.now() + timedelta(days=5), "MOS", "ABA"]))
+    #print (getSignature (newpassengers, list(tripClasses.values())[0], [datetime.now() + timedelta(days=5), "MOS", "ABA"]))
+    #print (getJsonRequest (newpassengers, list(tripClasses.values())[0], [datetime.now() + timedelta(days=5), "MOS", "ABA"])) 
+    print (requestFlights (getJsonRequest (newpassengers, list(tripClasses.values())[0], [datetime.now() + timedelta(days=1), "SVO", "ABA"],[datetime.now() + timedelta(days=3), "ABA", "SVO"])))
     #with open ("response.html", "w") as file:
         #file.write (getPage (generateUrl(getAirportCode(input("DEP:")), getAirportCode(input("ARR:")))))
 
